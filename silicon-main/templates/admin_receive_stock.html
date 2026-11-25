@@ -1,0 +1,135 @@
+{% extends "layout.html" %}
+{% block title %}Receive Stock | SILICON MART{% endblock %}
+{% block page_title %}Receive Stock{% endblock %}
+{% block content %}
+<style>
+  .inventory-page { --bg:#f8fafc; --card:#fff; --text:#0f172a; --muted:#64748b; --border:#e2e8f0; --primary:#2563eb; --green:#16a34a; --orange:#f59e0b; --red:#dc2626; max-width:600px; margin:0 auto; padding:8px 0 40px; }
+  .inventory-page * { box-sizing:border-box; }
+  .inventory-page .page-card { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:20px; box-shadow:0 8px 24px rgba(15,23,42,.08); }
+  .inventory-page label { display:block; margin:16px 0 7px; font-size:.86rem; font-weight:800; }
+  .inventory-page select,.inventory-page input,.inventory-page textarea { width:100%; min-height:52px; border:1px solid var(--border); border-radius:10px; padding:12px 14px; font:inherit; background:#fff; color:var(--text); }
+  .inventory-page textarea { min-height:88px; resize:vertical; }
+  .inventory-page .receive-row { display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); gap:9px; align-items:center; }
+  .inventory-page .receive-row input { text-align:center; font-size:1.1rem; font-weight:800; }
+  .inventory-page .receive-row strong { white-space:nowrap; }
+  .inventory-page .preview { margin-top:16px; padding:14px; border-radius:12px; background:linear-gradient(135deg,#f8fafc,#eff6ff); border:1px solid #dbeafe; }
+  .inventory-page .preview-row { display:flex; justify-content:space-between; gap:12px; padding:6px 0; }
+  .inventory-page .preview-row strong { color:var(--green); }
+  .inventory-page .banner { display:none; margin:12px 0; padding:12px 14px; border-radius:10px; background:#fee2e2; color:#991b1b; border:1px solid var(--red); font-weight:750; }
+  .inventory-page .submit { width:100%; min-height:58px; margin-top:16px; border:0; border-radius:12px; background:linear-gradient(135deg,#2563eb,#1d4ed8); color:#fff; font-weight:850; font-size:1rem; cursor:pointer; box-shadow:0 10px 22px rgba(37,99,235,.22); }
+  .inventory-page .submit:disabled { opacity:.65; cursor:not-allowed; box-shadow:none; }
+  .inventory-page .search-box { margin-bottom:8px; }
+  .inventory-page .product-detail { display:none; margin-top:12px; padding:13px; border-radius:12px; border:1px solid var(--border); background:#fff; }
+  .inventory-page .product-detail.show { display:block; }
+  .inventory-page .product-detail strong { display:block; font-size:1rem; }
+  .inventory-page .product-detail span { display:block; color:var(--muted); font-size:.78rem; margin-top:4px; line-height:1.45; }
+  .inventory-page .field-heading { display:flex; justify-content:space-between; align-items:center; }
+  .inventory-page .field-heading span { color:var(--muted); font-size:.75rem; }
+  @media(max-width:480px){ .inventory-page { padding:0 0 24px; } .inventory-page .page-card { padding:14px; border-radius:12px; } .inventory-page .receive-row { gap:6px; } .inventory-page .receive-row strong { font-size:.78rem; } }
+</style>
+<div class="inventory-page">
+  <div class="page-card">
+    <label for="productSearch">Find exact product</label>
+    <input id="productSearch" class="search-box" type="search" placeholder="Search name, size, barcode, or ID">
+    <label for="product">Product</label>
+    <select id="product"><option value="">Choose a product</option></select>
+    <div id="productDetail" class="product-detail"></div>
+    <label>You received:</label>
+    <div class="receive-row">
+      <input id="packs" type="number" min="1" step="1" value="0" aria-label="Packets">
+      <strong>packets</strong>
+      <input id="ppp" type="number" min="1" step="1" value="1" aria-label="Pieces per pack">
+    </div>
+    <div style="text-align:right;color:var(--muted);font-size:.78rem;margin-top:6px">pieces per pack</div>
+    <div class="preview">
+      <div class="preview-row"><span>This will add:</span><strong id="addPieces">0 pieces</strong></div>
+      <div class="preview-row"><span>Current stock:</span><strong id="currentStock" style="color:var(--text)">0 pieces</strong></div>
+      <div class="preview-row"><span>New stock:</span><strong id="newStock">0 pieces</strong></div>
+    </div>
+    <label for="cost">Cost per packet (optional)</label>
+    <input id="cost" type="number" min="0" step="0.01">
+    <label for="staff">Staff name</label>
+    <input id="staff" value="{{ session.user.name|default('') }}" readonly>
+    <label for="notes">Notes</label>
+    <textarea id="notes"></textarea>
+    <div id="banner" class="banner"></div>
+    <button id="submit" class="submit">✅ RECEIVE STOCK</button>
+  </div>
+</div>
+<script>
+const products={{products|tojson}};
+const select=document.getElementById('product');
+const productSearch=document.getElementById('productSearch');
+const productDetail=document.getElementById('productDetail');
+const categories={};
+products.forEach(p=>{const c=p.category||'Uncategorized';(categories[c]||(categories[c]=[])).push(p)});
+function renderProductOptions(query){
+  select.innerHTML='<option value="">Choose a product</option>';
+  const needle=(query||'').trim().toLowerCase();
+  Object.keys(categories).sort().forEach(category=>{
+    const matches=categories[category].filter(p=>{
+      if(!needle)return true;
+      return [p.name,p.id,p.barcode,p.category,p.description]
+        .some(v=>String(v||'').toLowerCase().includes(needle));
+    }).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+    if(!matches.length)return;
+    const group=document.createElement('optgroup');group.label=category;
+    matches.forEach(p=>{
+      const option=document.createElement('option');
+      option.value=p.id;
+      option.textContent=`${p.name} | ID: ${p.id}${p.barcode?' | Barcode: '+p.barcode:''} | Stock: ${p.stock||0}`;
+      option.dataset.pack=p.pack_size||1;
+      option.dataset.stock=p.stock||0;
+      option.dataset.name=p.name||p.id;
+      option.dataset.category=p.category||'Uncategorized';
+      option.dataset.barcode=p.barcode||'';
+      option.dataset.id=p.id;
+      group.appendChild(option);
+    });
+    select.appendChild(group);
+  });
+  productDetail.className='product-detail';
+  productDetail.innerHTML='';
+}
+renderProductOptions('');
+productSearch.addEventListener('input',()=>{
+  renderProductOptions(productSearch.value);
+});
+function updatePreview(){
+  const option=select.selectedOptions[0],packs=parseFloat(document.getElementById('packs').value)||0,ppp=parseFloat(document.getElementById('ppp').value)||0;
+  const add=packs*ppp,current=option?parseFloat(option.dataset.stock||0):0;
+  document.getElementById('addPieces').textContent=`${add} pieces`;document.getElementById('currentStock').textContent=`${current} pieces`;document.getElementById('newStock').textContent=`${current+add} pieces`;
+}
+select.addEventListener('change',()=>{
+  const option=select.selectedOptions[0];
+  if(option&&option.value){
+    document.getElementById('ppp').value=option.dataset.pack||1;
+    productDetail.className='product-detail show';
+    productDetail.innerHTML=`<strong>${option.dataset.name}</strong>
+      <span>Category: ${option.dataset.category}</span>
+      <span>ID: ${option.dataset.id}${option.dataset.barcode?' · Barcode: '+option.dataset.barcode:''}</span>
+      <span>Current stock: ${option.dataset.stock||0} pieces</span>`;
+  }else{
+    productDetail.className='product-detail';
+    productDetail.innerHTML='';
+  }
+  updatePreview();
+});
+['packs','ppp'].forEach(id=>document.getElementById(id).addEventListener('input',updatePreview));
+function showError(message){const banner=document.getElementById('banner');banner.textContent=message;banner.style.display='block'}
+document.getElementById('submit').addEventListener('click',async()=>{
+  const banner=document.getElementById('banner');banner.style.display='none';
+  if(!select.value)return showError('Choose a product');
+  const packs=parseInt(document.getElementById('packs').value||0);if(packs<=0)return showError('Enter packets received');
+  const button=document.getElementById('submit');button.disabled=true;button.textContent='⏳ Receiving...';
+  try{
+    const response=await fetch('/admin/receive-stock',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product_id:select.value,packs_received:packs,pieces_per_pack:parseInt(document.getElementById('ppp').value||1),cost_per_pack:document.getElementById('cost').value?parseFloat(document.getElementById('cost').value):null,notes:document.getElementById('notes').value})});
+    const data=await response.json();if(!response.ok||!data.success)throw new Error(data.error||'Receive failed');
+    alert(`Added ${data.total_pieces} pieces. New stock: ${data.new_stock}.`);
+    document.getElementById('packs').value=0;document.getElementById('cost').value='';document.getElementById('notes').value='';
+    select.selectedOptions[0].dataset.stock=data.new_stock;updatePreview();
+  }catch(error){showError(error.message)}
+  finally{button.disabled=false;button.textContent='✅ RECEIVE STOCK'}
+});
+</script>
+{% endblock %}

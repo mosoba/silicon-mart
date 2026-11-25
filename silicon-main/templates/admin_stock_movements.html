@@ -1,0 +1,54 @@
+{% extends "layout.html" %}
+{% block title %}Stock Movements | SILICON MART{% endblock %}
+{% block page_title %}Stock Movements{% endblock %}
+{% block content %}
+<style>
+  .inventory-page { --bg:#f8fafc; --card:#fff; --text:#0f172a; --muted:#64748b; --border:#e2e8f0; --primary:#2563eb; --green:#16a34a; --orange:#f59e0b; --red:#dc2626; max-width:900px; margin:0 auto; }
+  .inventory-page * { box-sizing:border-box; }
+  .inventory-page select { width:100%; min-height:52px; border:1px solid var(--border); border-radius:10px; padding:12px 14px; background:#fff; color:var(--text); font:inherit; }
+  .inventory-page .strip { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin:14px 0; }
+  .inventory-page .metric { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px 8px; text-align:center; box-shadow:0 4px 12px rgba(15,23,42,.05); }
+  .inventory-page .metric strong { display:block; font-size:1.4rem; } .inventory-page .metric span { color:var(--muted); font-size:.78rem; }
+  .inventory-page .table-wrap { overflow-x:auto; background:var(--card); border:1px solid var(--border); border-radius:12px; box-shadow:0 6px 18px rgba(15,23,42,.07); }
+  .inventory-page table { width:100%; border-collapse:collapse; min-width:620px; } .inventory-page th,.inventory-page td { padding:12px; border-bottom:1px solid var(--border); text-align:left; } .inventory-page th { color:var(--muted); font-size:.78rem; } .inventory-page tr:last-child td { border-bottom:0; }
+  .inventory-page .positive { color:#166534; font-weight:800; } .inventory-page .negative { color:#991b1b; font-weight:800; }
+  .inventory-page .badge { display:inline-block; margin-left:6px; padding:3px 7px; border-radius:999px; background:#dcfce7; color:#166534; font-size:.75rem; } .inventory-page .badge.warning { background:#fef3c7; color:#92400e; }
+  .inventory-page .empty { display:none; padding:28px 12px; text-align:center; color:var(--muted); }
+  @media(max-width:480px){ .inventory-page .strip { gap:6px; } .inventory-page .metric { padding:12px 4px; } }
+</style>
+<div class="inventory-page">
+  <select id="product">
+    <option value="">Choose a product</option>
+    {% for p in products %}
+    {% if p.parent_id %}<option value="{{p.id}}">└ {{p.name}}</option>{% else %}<option value="{{p.id}}">{{p.name}}</option>{% endif %}
+    {% endfor %}
+  </select>
+  <div id="strip" class="strip"></div>
+  <div class="table-wrap">
+    <table><thead><tr><th>Date</th><th>Icon + Event</th><th>Detail</th><th>Qty</th></tr></thead><tbody id="timeline"></tbody></table>
+    <div id="empty" class="empty">No movements yet for this product.</div>
+  </div>
+</div>
+<script>
+const select=document.getElementById('product'),timeline=document.getElementById('timeline'),empty=document.getElementById('empty');
+const num=v=>parseFloat(v||0);
+const date=v=>{if(!v)return'';const d=new Date(v);return isNaN(d)?v:d.toLocaleString()};
+select.addEventListener('change',async()=>{
+  if(!select.value)return;
+  const response=await fetch('/admin/api/stock-movements?product_id='+encodeURIComponent(select.value));
+  const data=await response.json();if(!response.ok||data.success===false){empty.style.display='block';empty.textContent=data.error||'Could not load movements';return}
+  const bulk=data.product.is_bulk===true||data.product.is_bulk==='true';
+  let received=0,opened=0;data.received.forEach(r=>received+=num(r.quantity_added));data.splits.forEach(s=>opened+=num(s.parent_qty_used));
+  document.getElementById('strip').innerHTML=bulk
+    ?`<div class="metric"><strong>${received}</strong><span>Received</span></div><div class="metric"><strong>${opened}</strong><span>Opened</span></div><div class="metric"><strong>${num(data.product.stock)}</strong><span>Remaining</span></div>`
+    :`<div class="metric" style="grid-column:1/-1"><strong>${num(data.product.stock)}</strong><span>Current stock</span></div>`;
+  const events=[];
+  data.received.forEach(r=>events.push({date:r.created_at,icon:'📥',event:'Received',detail:r.reason||'Stock received',qty:num(r.quantity_added)}));
+  data.splits.forEach(s=>{const children=s.children.map(c=>`${c.qty}× ${c.child_name}`).join(', '),variance=num(s.variance_kg),badge=variance===0?'✅ 0kg':`⚠️ ${variance}kg missing`;events.push({date:s.created_at,icon:'✂️',event:'Split',detail:`→ ${children} <span class="badge ${variance===0?'':'warning'}">${badge}</span>`,qty:-num(s.parent_qty_used)})});
+  data.sales.forEach(s=>events.push({date:s.created_at,icon:'💰',event:'Sold',detail:`Order ${s.order_id||''}`,qty:-num(s.quantity)}));
+  events.sort((a,b)=>new Date(b.date||0)-new Date(a.date||0));
+  timeline.innerHTML=events.map(e=>`<tr><td>${date(e.date)}</td><td>${e.icon} ${e.event}</td><td>${e.detail}</td><td class="${e.qty>=0?'positive':'negative'}">${e.qty>=0?'+':''}${e.qty}</td></tr>`).join('');
+  empty.style.display=events.length?'none':'block';
+});
+</script>
+{% endblock %}

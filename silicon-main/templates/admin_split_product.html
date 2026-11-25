@@ -1,0 +1,380 @@
+{% extends "layout.html" %}
+{% block title %}Split Bulk Item | SILICON MART{% endblock %}
+{% block page_title %}Split Bulk Item{% endblock %}
+{% block content %}
+<style>
+  .inventory-page { --bg:#f8fafc; --card:#fff; --text:#0f172a; --muted:#64748b; --border:#e2e8f0; --primary:#2563eb; --green:#16a34a; --orange:#f59e0b; --red:#dc2626; max-width:640px; margin:0 auto; padding:8px 0 40px; }
+  .inventory-page * { box-sizing:border-box; }
+  .inventory-page .page-card { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:20px; box-shadow:0 8px 24px rgba(15,23,42,.08); }
+  .inventory-page label { display:block; margin:16px 0 7px; font-size:.86rem; font-weight:800; color:var(--text); }
+  .inventory-page select,.inventory-page input,.inventory-page textarea { width:100%; min-height:52px; border:1px solid var(--border); border-radius:10px; padding:12px 14px; font:inherit; background:#fff; color:var(--text); }
+  .inventory-page textarea { min-height:88px; resize:vertical; }
+  .inventory-page .child-row { display:grid; grid-template-columns:minmax(0,1fr) 112px; gap:12px; align-items:center; padding:13px 0; border-bottom:1px solid var(--border); }
+  .inventory-page .child-controls { display:grid; grid-template-columns:112px; gap:8px; align-items:end; }
+  .inventory-page .qty-control label { display:block; margin:0 0 4px; font-size:.75rem; color:var(--muted); }
+  .inventory-page .qty-control input { min-height:48px; text-align:center; font-weight:800; }
+  .inventory-page .quick-qty { display:none; }
+  .inventory-page .child-row:last-child { border-bottom:0; }
+  .inventory-page .child-name { font-weight:800; }
+  .inventory-page .child-meta { color:var(--muted); font-size:.78rem; margin-top:4px; }
+  .inventory-page .qty { text-align:center; font-size:1.08rem; font-weight:800; }
+  .inventory-page .summary { position:sticky; bottom:12px; z-index:5; margin:16px 0 12px; padding:13px; border-radius:12px; background:#fff; border:2px solid var(--border); box-shadow:0 8px 24px rgba(15,23,42,.12); font-weight:850; text-align:center; }
+  .inventory-page .summary.equal { border-color:var(--green); color:#166534; }
+  .inventory-page .summary.less { border-color:var(--orange); color:#92400e; }
+  .inventory-page .summary.over { border-color:var(--red); color:#991b1b; }
+  .inventory-page .banner { display:none; margin:12px 0; padding:12px 14px; border-radius:10px; background:#fee2e2; color:#991b1b; border:1px solid var(--red); font-weight:750; }
+  .inventory-page .empty { margin:14px 0 0; padding:16px; border-radius:10px; background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; line-height:1.5; }
+  .inventory-page .submit { min-height:58px; border:0; border-radius:12px; background:linear-gradient(135deg,#2563eb,#1d4ed8); color:#fff; font-weight:850; font-size:1rem; cursor:pointer; box-shadow:0 10px 24px rgba(37,99,235,.20); }
+  .inventory-page .submit:disabled { opacity:.65; cursor:not-allowed; box-shadow:none; }
+  .inventory-page .mode-tabs { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px; }
+  .inventory-page .mode-tab { min-height:48px; border:1px solid var(--border); border-radius:10px; background:#fff; color:var(--text); font-weight:800; cursor:pointer; }
+  .inventory-page .mode-tab.active { border-color:var(--primary); background:#eff6ff; color:#1d4ed8; }
+  .inventory-page .add-card { display:none; }
+  .inventory-page .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .inventory-page .child-editor { display:grid; grid-template-columns:1fr 1fr 78px 78px 78px 42px; gap:8px; align-items:end; padding:10px 0; border-bottom:1px solid var(--border); }
+  .inventory-page .child-editor label { margin:0 0 5px; font-size:.72rem; }
+  .inventory-page .remove-child { min-height:52px; border:1px solid #fecaca; border-radius:10px; background:#fff1f2; color:#991b1b; font-weight:800; cursor:pointer; }
+  .inventory-page .add-child { min-height:48px; margin-top:10px; border:1px dashed #93c5fd; border-radius:10px; background:#eff6ff; color:#1d4ed8; font-weight:800; cursor:pointer; }
+  .inventory-page .weight-presets { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 10px; }
+  .inventory-page .weight-preset { width:auto; min-height:38px; padding:7px 10px; border:1px solid #bfdbfe; border-radius:8px; background:#eff6ff; color:#1d4ed8; font-weight:800; cursor:pointer; }
+  .inventory-page .section-title { margin:18px 0 8px; font-size:.92rem; }
+  .inventory-page .split-steps { display:grid; gap:10px; }
+  .inventory-page .step { border:1px solid var(--border); border-radius:12px; padding:12px; background:#fff; }
+  .inventory-page .step-number { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; margin-right:7px; border-radius:50%; background:#eff6ff; color:#1d4ed8; font-weight:900; }
+  .inventory-page .child-row { grid-template-columns:minmax(0,1fr) 132px; }
+  .inventory-page .bag-size { display:block; font-size:.72rem; color:var(--muted); margin-top:4px; }
+  .inventory-page .kg-used { display:block; color:#1d4ed8; font-size:.78rem; margin-top:4px; font-weight:800; }
+  .inventory-page .submit.full { width:100%; }
+  .inventory-page .unit-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; }
+  .inventory-page .unit-card { min-height:68px; border:2px solid var(--border); border-radius:12px; background:#fff; color:var(--text); font-weight:850; cursor:pointer; }
+  .inventory-page .unit-card.active { border-color:var(--primary); background:#eff6ff; color:#1d4ed8; }
+  .inventory-page .unit-card.disabled { border-style:dashed; background:#f8fafc; color:#94a3b8; cursor:not-allowed; }
+  .inventory-page .unit-card small { display:block; margin-top:3px; color:var(--muted); font-weight:700; }
+  .inventory-page .add-size { width:100%; min-height:52px; margin-top:10px; border:0; border-radius:10px; background:#0f172a; color:#fff; font-weight:850; cursor:pointer; }
+  .inventory-page .allocation-list { display:grid; gap:8px; margin-top:12px; }
+  .inventory-page .allocation-row { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:8px; align-items:center; border:1px solid var(--border); border-radius:10px; padding:10px 12px; background:#fff; }
+  .inventory-page .allocation-row strong { font-size:.82rem; }
+  .inventory-page .allocation-row span { color:var(--muted); font-size:.78rem; }
+  .inventory-page .remove-allocation { width:36px; min-height:36px; padding:0; border:0; border-radius:8px; background:#fee2e2; color:#991b1b; font-weight:900; cursor:pointer; }
+  @media(max-width:480px){ .inventory-page { padding:0 0 24px; } .inventory-page .page-card { padding:14px; border-radius:12px; } .inventory-page .unit-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .inventory-page .allocation-row { grid-template-columns:minmax(0,1fr) auto; } .inventory-page .allocation-row > span { grid-column:1 / -1; } }
+  @media(max-width:600px){ .inventory-page .grid-2 { grid-template-columns:1fr; } .inventory-page .child-editor { grid-template-columns:minmax(0,1fr) 42px; } .inventory-page .child-editor > div { grid-column:1; } .inventory-page .remove-child { grid-column:2; grid-row:1; } }
+</style>
+<div class="inventory-page">
+  <div class="page-card">
+    <div class="mode-tabs">
+      <button type="button" class="mode-tab active" id="splitTab">✂️ Split item</button>
+      <button type="button" class="mode-tab" id="addTab">➕ Add bulk item</button>
+    </div>
+    <div id="splitCard">
+    <h3 class="section-title"><span class="step-number">1</span> Choose the sack you opened</h3>
+    <label for="parent">Bulk sack</label>
+    <select id="parent">
+      <option value="">Choose a bulk item</option>
+      {% for p in parents %}
+      <option value="{{ p.id }}" data-weight="{{ p.weight_kg|default(0) }}">{{ p.name }} — {{ p.stock|default(0) }} sack(s) left</option>
+      {% endfor %}
+    </select>
+    {% if not parents %}
+    <div class="empty">No bulk products are available. Add a product with <strong>is_bulk = true</strong>, <strong>weight_kg</strong>, and stock greater than zero.</div>
+    {% endif %}
+    <h3 class="section-title"><span class="step-number">2</span> Choose packet size</h3>
+    <div id="unitGrid" class="unit-grid"></div>
+    <label id="qtyLabel" for="splitQty">How many bags?</label>
+    <div id="qtyHelp" style="color:#64748b;font-size:.78rem;margin:-2px 0 8px;">Choose a packet size first, then enter how many packets you produced.</div>
+    <input id="splitQty" type="number" min="0.25" step="0.25" value="1" inputmode="decimal">
+    <button type="button" id="addAllocation" class="add-size">＋ ADD THIS BAG SIZE</button>
+    <div id="allocationList" class="allocation-list"></div>
+    <h3 class="section-title"><span class="step-number">3</span> Confirm</h3>
+    <label for="staff">Staff name</label>
+    <input id="staff" value="{{ session.user.name|default('') }}" readonly>
+    <label for="notes">Notes</label>
+    <textarea id="notes" placeholder="Optional notes"></textarea>
+    <div id="banner" class="banner"></div>
+    <div id="summary" class="summary">Select a bulk item</div>
+    <button id="submit" class="submit">✅ SPLIT NOW</button>
+    </div>
+    <div id="addCard" class="add-card">
+      <label for="bulkId">Bulk item ID *</label>
+      <input id="bulkId" placeholder="sugar_10kg">
+      <label for="bulkName">Bulk item name *</label>
+      <input id="bulkName" placeholder="Sugar 10kg bag">
+      <div class="grid-2">
+        <div><label for="bulkCategory">Category</label><input id="bulkCategory" placeholder="Sugar"></div>
+        <div><label for="bulkWeight">Total weight (kg) *</label><input id="bulkWeight" type="number" min="0.01" step="0.01" placeholder="10"></div>
+      </div>
+      <div class="grid-2">
+        <div><label for="bulkStock">Sacks received *</label><input id="bulkStock" type="number" min="1" step="1" placeholder="1"></div>
+        <div><label for="bulkCost">Bulk cost price</label><input id="bulkCost" type="number" min="0" step="0.01" placeholder="1300"></div>
+      </div>
+      <label for="bulkPrice">Bulk selling price</label>
+      <input id="bulkPrice" type="number" min="0" step="0.01" placeholder="1300">
+      <label>Sellable bag sizes</label>
+      <div class="weight-presets" aria-label="Quick bag weights">
+        <button type="button" class="weight-preset" data-weight="0.25" data-name="Quarter kg">¼ kg</button>
+        <button type="button" class="weight-preset" data-weight="0.5" data-name="Half kg">½ kg</button>
+        <button type="button" class="weight-preset" data-weight="1" data-name="1 kg">1 kg</button>
+        <button type="button" class="weight-preset" data-weight="2" data-name="2 kg">2 kg</button>
+        <button type="button" class="weight-preset" data-weight="5" data-name="5 kg">5 kg</button>
+      </div>
+      <div id="childEditors"></div>
+      <button type="button" id="addChild" class="add-child full">＋ Add bag size</button>
+      <div id="addBanner" class="banner"></div>
+      <button type="button" id="saveBulk" class="submit full">💾 SAVE BULK ITEM</button>
+    </div>
+  </div>
+</div>
+<script>
+let parentData=null, children=[];
+const splitTab=document.getElementById('splitTab');
+const addTab=document.getElementById('addTab');
+const splitCard=document.getElementById('splitCard');
+const addCard=document.getElementById('addCard');
+const childEditors=document.getElementById('childEditors');
+
+function showAddBulkError(message){
+  const banner=document.getElementById('addBanner');
+  banner.textContent=message;
+  banner.style.display='block';
+}
+function clearAddBulkError(){
+  const banner=document.getElementById('addBanner');
+  banner.style.display='none';
+  banner.textContent='';
+}
+function addChildEditor(values){
+  values=values||{};
+  const row=document.createElement('div');
+  row.className='child-editor';
+  row.innerHTML=`
+    <div><label>Child ID *</label><input class="child-id" placeholder="sugar_1kg" value="${values.id||''}"></div>
+    <div><label>Child name *</label><input class="child-name-input" placeholder="Sugar 1kg" value="${values.name||''}"></div>
+    <div class="weight-field"><label>Weight kg *</label><input class="child-weight" type="number" min="0.01" step="0.01" value="${values.weight||''}" placeholder="1"></div>
+    <div class="unit-field"><label>Bags/sack *</label><input class="child-unit" type="number" min="0.01" step="0.01" value="${values.unit||''}" placeholder="10"></div>
+    <div class="price-field"><label>Selling price</label><input class="child-price" type="number" min="0" step="0.01" value="${values.price||''}" placeholder="150"></div>
+    <button type="button" class="remove-child" title="Remove bag size">×</button>`;
+  row.querySelector('.remove-child').addEventListener('click',()=>{
+    row.remove();
+  });
+  const weightInput=row.querySelector('.child-weight');
+  const unitInput=row.querySelector('.child-unit');
+  weightInput.addEventListener('input',()=>{
+    if(unitInput.value) return;
+    const bulkWeight=parseFloat(document.getElementById('bulkWeight').value)||0;
+    const childWeight=parseFloat(weightInput.value)||0;
+    if(bulkWeight>0&&childWeight>0) unitInput.value=Number((bulkWeight/childWeight).toFixed(4));
+  });
+  childEditors.appendChild(row);
+}
+splitTab.addEventListener('click',()=>{
+  splitTab.classList.add('active');addTab.classList.remove('active');
+  splitCard.style.display='block';addCard.style.display='none';
+});
+addTab.addEventListener('click',()=>{
+  addTab.classList.add('active');splitTab.classList.remove('active');
+  splitCard.style.display='none';addCard.style.display='block';
+});
+document.getElementById('addChild').addEventListener('click',()=>addChildEditor());
+addChildEditor();
+document.querySelectorAll('.weight-preset').forEach(button=>{
+  button.addEventListener('click',()=>{
+    const weight=parseFloat(button.dataset.weight)||0;
+    const bulkWeight=parseFloat(document.getElementById('bulkWeight').value)||0;
+    const unitFactor=bulkWeight>0&&weight>0?Number((bulkWeight/weight).toFixed(4)):0;
+    const bulkId=document.getElementById('bulkId').value.trim();
+    const bulkName=document.getElementById('bulkName').value.trim();
+    const slugWeight=button.dataset.weight==='0.25'?'250g':button.dataset.weight==='0.5'?'500g':`${button.dataset.weight}kg`;
+    addChildEditor({
+      id:bulkId?`${bulkId}_${slugWeight}`:``,
+      name:bulkName?`${bulkName.replace(/\s*[\d.]+\s*kg.*$/i,'')} ${slugWeight}`:``,
+      weight,
+      unit:unitFactor
+    });
+  });
+});
+
+document.getElementById('saveBulk').addEventListener('click',async()=>{
+  clearAddBulkError();
+  const parentId=document.getElementById('bulkId').value.trim();
+  const name=document.getElementById('bulkName').value.trim();
+  const weight=parseFloat(document.getElementById('bulkWeight').value)||0;
+  const stock=parseFloat(document.getElementById('bulkStock').value)||0;
+  if(!parentId||!name||weight<=0||stock<=0){
+    showAddBulkError('Enter the bulk item ID, name, weight, and sacks received.');
+    return;
+  }
+  const childRows=[...childEditors.querySelectorAll('.child-editor')];
+  const childrenPayload=childRows.map(row=>({
+    id:row.querySelector('.child-id').value.trim(),
+    name:row.querySelector('.child-name-input').value.trim(),
+    weight_kg:parseFloat(row.querySelector('.child-weight').value)||0,
+    unit_factor:parseFloat(row.querySelector('.child-unit').value)||0,
+    price:parseFloat(row.querySelector('.child-price').value)||0
+  })).filter(child=>child.id||child.name||child.weight_kg);
+  if(!childrenPayload.length){
+    showAddBulkError('Add at least one sellable bag size.');
+    return;
+  }
+  for(const child of childrenPayload){
+    if(!child.id||!child.name||child.weight_kg<=0||child.unit_factor<=0){
+      showAddBulkError('Each bag size needs an ID, name, weight, and bags/sack.');
+      return;
+    }
+  }
+  const button=document.getElementById('saveBulk');
+  button.disabled=true;button.textContent='⏳ Saving...';
+  try{
+    const response=await fetch('/admin/api/bulk-products',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        parent_id:parentId,
+        name:name,
+        category:document.getElementById('bulkCategory').value.trim(),
+        weight_kg:weight,
+        stock:stock,
+        cost_price:parseFloat(document.getElementById('bulkCost').value)||0,
+        price:parseFloat(document.getElementById('bulkPrice').value)||0,
+        children:childrenPayload
+      })
+    });
+    const data=await response.json();
+    if(!response.ok||!data.success)throw new Error(data.error||'Could not save bulk item');
+    alert(`Bulk item ${name} was added successfully.`);
+    location.reload();
+  }catch(error){showAddBulkError(error.message)}
+  finally{button.disabled=false;button.textContent='💾 SAVE BULK ITEM'}
+});
+const parentSelect=document.getElementById('parent');
+const summary=document.getElementById('summary');
+const banner=document.getElementById('banner');
+const unitGrid=document.getElementById('unitGrid');
+const splitQty=document.getElementById('splitQty');
+const allocationList=document.getElementById('allocationList');
+let selectedChild=null;
+let allocations=[];
+function bagWeightLabel(weight){
+  const value=parseFloat(weight)||0;
+  if(value===0.25)return '¼ kg';
+  if(value===0.5)return '½ kg';
+  return `${String(value)} kg`;
+}
+function showError(message){banner.textContent=message;banner.style.display='block'}
+parentSelect.addEventListener('change',async()=>{
+  banner.style.display='none'; unitGrid.innerHTML=''; allocationList.innerHTML=''; children=[];selectedChild=null;allocations=[];
+  if(!parentSelect.value){summary.textContent='Select a bulk item';summary.className='summary';return}
+  try{
+    const response=await fetch('/admin/api/parent-children?parent_id='+encodeURIComponent(parentSelect.value));
+    const data=await response.json();
+    if(!response.ok||data.success===false)throw new Error(data.error||'Could not load child products');
+    children=data;
+    if(!children.length){unitGrid.innerHTML='<div class="empty">This sack has no packet sizes set yet. Open <strong>Add bulk item</strong> and add sizes such as ¼kg, ½kg, 1kg, or 2kg.</div>';return}
+    const preferredWeights=[0.25,0.5,1,2];
+    const configuredCards=preferredWeights.map(weight=>{
+      return children.find(c=>Math.abs(parseFloat(c.weight_kg)-weight)<0.0001)||{
+        id:'',
+        name:'Set up first',
+        weight_kg:weight,
+        unit_factor:0
+      };
+    });
+    const extraCards=children.filter(c =>
+      !preferredWeights.some(weight=>Math.abs(parseFloat(c.weight_kg)-weight)<0.0001)
+    );
+    unitGrid.innerHTML=[...configuredCards,...extraCards].map(c=>`
+      <button type="button" class="unit-card${c.id?'':' disabled'}" data-id="${c.id}"${c.id?'':' disabled'}>
+        ${bagWeightLabel(c.weight_kg)}
+        <small>${c.id?c.name:'Set up first'}</small>
+      </button>`).join('');
+    document.querySelectorAll('.unit-card').forEach(button=>button.addEventListener('click',()=>{
+      document.querySelectorAll('.unit-card').forEach(b=>b.classList.remove('active'));
+      button.classList.add('active');
+      selectedChild=children.find(c=>c.id===button.dataset.id);
+      document.getElementById('qtyLabel').textContent=`How many ${bagWeightLabel(selectedChild.weight_kg)} packets?`;
+      document.getElementById('qtyHelp').textContent=`Enter the quantity of ${bagWeightLabel(selectedChild.weight_kg)} packets you produced.`;
+      splitQty.value=1;
+    }));
+    parentData={weight:parseFloat(parentSelect.selectedOptions[0].dataset.weight||0)};
+    updateSummary();
+  }catch(error){showError(error.message)}
+});
+function updateSummary(){
+  let produced=allocations.reduce((sum,a)=>{
+    const child=children.find(c=>c.id===a.child_id);
+    const unitFactor=parseFloat(a.unit_factor||child?.unit_factor||1);
+    const weightPerBag=unitFactor>0?(parentData?.weight||0)/unitFactor:0;
+    return sum+a.qty_produced*weightPerBag;
+  },0);
+  const available=parentData?parentData.weight:0;
+  summary.className='summary';
+  const producedText=produced.toFixed(3).replace(/\.?0+$/, '');
+  const availableText=available.toFixed(3).replace(/\.?0+$/, '');
+  if(produced===available){summary.classList.add('equal');summary.textContent=`✅ COMPLETE: ${producedText}kg used from ${availableText}kg sack`}
+  else if(produced<available){summary.classList.add('less');summary.textContent=`🟠 PARTIAL: ${producedText}kg used · ${(available-produced).toFixed(3).replace(/\.?0+$/, '')}kg remains in the sack`}
+  else{summary.classList.add('over');summary.textContent=`🔴 TOO MUCH: ${producedText}kg entered · sack has ${availableText}kg`}
+}
+
+function renderAllocations(){
+  allocationList.innerHTML=allocations.length?allocations.map((a,index)=>{
+    const child=children.find(c=>c.id===a.child_id);
+    const weight=(parentData?.weight||0)/parseFloat(a.unit_factor||1);
+    const kg=a.qty_produced*weight;
+    return `<div class="allocation-row">
+      <strong>${bagWeightLabel(child?.weight_kg||weight)} packets</strong>
+      <span>${String(a.qty_produced)} bags · ${kg.toFixed(3).replace(/\.0+$/, '')}kg</span>
+      <button type="button" class="remove-allocation" data-index="${index}" aria-label="Remove">×</button>
+    </div>`;
+  }).join(''):'';
+  document.querySelectorAll('.remove-allocation').forEach(button=>button.addEventListener('click',()=>{
+    allocations.splice(parseInt(button.dataset.index),1);
+    renderAllocations();
+    updateSummary();
+  }));
+}
+
+document.getElementById('addAllocation').addEventListener('click',()=>{
+  banner.style.display='none';
+  if(!selectedChild)return showError('Choose a bag size first');
+  const qty=parseFloat(splitQty.value)||0;
+  if(qty<=0)return showError('Enter how many bags you finished');
+  const weightPerBag=(parentData?.weight||0)/parseFloat(selectedChild.unit_factor||1);
+  const currentKg=allocations.reduce((sum,a)=>{
+    const unit=parseFloat(a.unit_factor||1);
+    return sum+a.qty_produced*((parentData?.weight||0)/unit);
+  },0);
+  const adding=qty*weightPerBag;
+  if(currentKg+adding>(parentData?.weight||0)+0.0001){
+    return showError(`That would use ${(currentKg+adding).toFixed(3)}kg, but only ${parentData.weight}kg is available`);
+  }
+  const existing=allocations.find(a=>a.child_id===selectedChild.id);
+  if(existing){
+    existing.qty_produced+=qty;
+  }else{
+    allocations.push({
+      child_id:selectedChild.id,
+      qty_produced:qty,
+      unit_factor:parseFloat(selectedChild.unit_factor||1)
+    });
+  }
+  renderAllocations();
+  updateSummary();
+  splitQty.value=1;
+  document.querySelectorAll('.unit-card').forEach(b=>b.classList.remove('active'));
+  selectedChild=null;
+  document.getElementById('qtyLabel').textContent='How many bags?';
+});
+
+document.getElementById('submit').addEventListener('click',async()=>{
+  banner.style.display='none';
+  if(!parentSelect.value)return showError('Choose a bulk item');
+  if(!allocations.length)return showError('Enter at least one quantity');
+  const button=document.getElementById('submit');button.disabled=true;button.textContent='⏳ Splitting...';
+  try{
+    const response=await fetch('/admin/products/split',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({parent_id:parentSelect.value,allocations,notes:document.getElementById('notes').value})});
+    const data=await response.json();if(!response.ok||!data.success)throw new Error(data.error||'Split failed');
+    alert(`Done! Bulk item split successfully. Variance: ${data.variance_kg} kg.`);
+    location.reload();
+  }catch(error){showError(error.message)}
+  finally{button.disabled=false;button.textContent='✅ SPLIT NOW'}
+});
+</script>
+{% endblock %}
